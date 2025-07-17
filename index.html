@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faulty Deployment Detection - Interactive Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1em;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 5px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            color: white;
+            font-weight: 500;
+        }
+
+        .tab.active {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .deployment-list {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .deployment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.3s ease;
+        }
+
+        .deployment-item:hover {
+            background-color: #f9f9f9;
+        }
+
+        .deployment-status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .status-healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-faulty {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-unknown {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .algorithm-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .algorithm-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .algorithm-card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 20px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+        }
+
+        .weak-supervision-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .weak-label {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .weak-label-weight {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .time-series-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Faulty Deployment Detection</h1>
+            <p>Interactive demonstration of Datadog's journey from unsupervised to supervised learning</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="overview">Overview</div>
+            <div class="tab" data-tab="unsupervised">Unsupervised Approach</div>
+            <div class="tab" data-tab="supervised">Supervised Learning</div>
+            <div class="tab" data-tab="weak-supervision">Weak Supervision</div>
+            <div class="tab" data-tab="results">Results & Comparison</div>
+        </div>
+
+        <div class="tab-content active" id="overview">
+            <div class="section">
+                <h3>🎯 The Challenge</h3>
+                <p>According to Google SRE, deployments account for approximately 70% of incidents. This demo explores how Datadog developed an automated system to detect faulty deployments using machine learning.</p>
+            </div>
+
+            <div class="section">
+                <h3>📊 Key Challenges</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">No Labels</div>
+                        <div class="metric-label">Lack of ground truth data</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">Data Imbalance</div>
+                        <div class="metric-label">Faulty deployments are rare</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">Diversity</div>
+                        <div class="metric-label">Different application profiles</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">Time Pressure</div>
+                        <div class="metric-label">Need for quick detection</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🔬 Definition of Faulty Deployment</h3>
+                <p>A deployment is considered faulty if it exhibits:</p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Impact:</strong> Significant increase in error rate relative to baseline</li>
+                    <li><strong>Temporal Correlation:</strong> Error increase aligns with deployment timing</li>
+                    <li><strong>Persistence:</strong> Increased error rate is sustained over time</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h3>🛤️ Evolution Path</h3>
+                <p>The project evolved through three main phases:</p>
+                <ol style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Unsupervised Approach:</strong> Rule-based statistical checks with iterative refinement</li>
+                    <li><strong>Supervised Learning:</strong> Sequential models trained on ensemble outputs</li>
+                    <li><strong>Weak Supervision:</strong> Improved label quality through multiple weak signals</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="tab-content" id="unsupervised">
+            <div class="section">
+                <h3>📈 Simulate Deployment Monitoring</h3>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Deployment Type:</label>
+                        <select id="deploymentType">
+                            <option value="normal">Normal Deployment</option>
+                            <option value="faulty">Faulty Deployment</option>
+                            <option value="seasonal">Seasonal App</option>
+                            <option value="lowTraffic">Low Traffic App</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Error Rate Increase:</label>
+                        <input type="range" id="errorIncrease" min="0" max="500" value="50">
+                        <span id="errorIncreaseValue">50%</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Base Error Rate:</label>
+                        <input type="range" id="baseError" min="0.1" max="10" step="0.1" value="2">
+                        <span id="baseErrorValue">2%</span>
+                    </div>
+                    <button onclick="simulateDeployment()">Simulate Deployment</button>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="deploymentChart"></canvas>
+            </div>
+
+            <div class="section">
+                <h3>🔍 Statistical Checks</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="impactCheck">-</div>
+                        <div class="metric-label">Impact Check</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="temporalCheck">-</div>
+                        <div class="metric-label">Temporal Check</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="persistenceCheck">-</div>
+                        <div class="metric-label">Persistence Check</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="finalDecision">-</div>
+                        <div class="metric-label">Final Decision</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>⚖️ Iterative Framework</h3>
+                <p>The unsupervised approach uses unanimous voting: all checks must pass for a deployment to be flagged as faulty.</p>
+                <div class="deployment-list" id="deploymentHistory">
+                    <div style="text-align: center; color: #666; padding: 20px;">
+                        Simulate deployments to see history
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="supervised">
+            <div class="section">
+                <h3>⏱️ Sequential Model Approach</h3>
+                <p>Train models to predict 60-minute ensemble results using early data (10 and 20 minutes).</p>
+                
+                <div class="time-series-controls">
+                    <button onclick="runSequentialModel(10)">Run 10-Min Model</button>
+                    <button onclick="runSequentialModel(20)">Run 20-Min Model</button>
+                    <button onclick="runSequentialModel(60)">Run 60-Min Model</button>
+                    <button onclick="resetSequentialDemo()">Reset</button>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="sequentialChart"></canvas>
+            </div>
+
+            <div class="section">
+                <h3>🎯 Model Performance</h3>
+                <div class="algorithm-comparison">
+                    <div class="algorithm-card">
+                        <h4>10-Minute Model</h4>
+                        <div>Coverage: <span id="coverage10">21.5%</span></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress10" style="width: 21.5%"></div>
+                        </div>
+                        <div>Trade-off: High precision, low recall</div>
+                    </div>
+                    <div class="algorithm-card">
+                        <h4>20-Minute Model</h4>
+                        <div>Coverage: <span id="coverage20">25.9%</span></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress20" style="width: 25.9%"></div>
+                        </div>
+                        <div>Trade-off: Balanced precision/recall</div>
+                    </div>
+                    <div class="algorithm-card">
+                        <h4>60-Minute Model</h4>
+                        <div>Coverage: <span id="coverage60">62.9%</span></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress60" style="width: 62.9%"></div>
+                        </div>
+                        <div>Trade-off: High recall, slower detection</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🔄 Training Process</h3>
+                <p>The supervised models use features from statistical checks computed at early timestamps to predict the final ensemble decision. This approach allows for faster detection while maintaining accuracy.</p>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Feature Set:</label>
+                        <select id="featureSet">
+                            <option value="basic">Basic Statistical Features</option>
+                            <option value="enhanced">Enhanced with Domain Knowledge</option>
+                            <option value="full">Full Feature Set</option>
+                        </select>
+                    </div>
+                    <button onclick="trainSupervisedModel()">Train Model</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="weak-supervision">
+            <div class="section">
+                <h3>🏷️ Weak Supervision Framework</h3>
+                <p>Instead of manual labeling, we use multiple weak signals to generate high-quality labels automatically.</p>
+            </div>
+
+            <div class="section">
+                <h3>📊 Weak Label Sources</h3>
+                <div class="weak-supervision-grid">
+                    <div class="weak-label">
+                        <div class="weak-label-weight" id="rollbackWeight">0.85</div>
+                        <div class="metric-label">Version Rollback</div>
+                    </div>
+                    <div class="weak-label">
+                        <div class="weak-label-weight" id="shortLivedWeight">0.72</div>
+                        <div class="metric-label">Short-lived Version</div>
+                    </div>
+                    <div class="weak-label">
+                        <div class="weak-label-weight" id="errorSignatureWeight">0.68</div>
+                        <div class="metric-label">New Error Signatures</div>
+                    </div>
+                    <div class="weak-label">
+                        <div class="weak-label-weight" id="statisticalWeight">0.79</div>
+                        <div class="metric-label">Statistical Rules</div>
+                    </div>
+                    <div class="weak-label">
+                        <div class="weak-label-weight" id="incidentWeight">0.91</div>
+                        <div class="metric-label">Incident Correlation</div>
+                    </div>
+                    <div class="weak-label">
+                        <div class="weak-label-weight" id="performanceWeight">0.64</div>
+                        <div class="metric-label">Performance Degradation</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🧮 Label Generation Process</h3>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Weak Labels Present:</label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <label><input type="checkbox" id="hasRollback"> Rollback</label>
+                            <label><input type="checkbox" id="hasShortLived"> Short-lived</label>
+                            <label><input type="checkbox" id="hasNewErrors"> New Errors</label>
+                            <label><input type="checkbox" id="hasIncident"> Incident</label>
+                        </div>
+                    </div>
+                    <button onclick="generateWeakLabel()">Generate Strong Label</button>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="weakLabelConfidence">-</div>
+                        <div class="metric-label">Label Confidence</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="weakLabelPrediction">-</div>
+                        <div class="metric-label">Predicted Label</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="weakLabelCoverage">-</div>
+                        <div class="metric-label">Coverage</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="weakLabelAccuracy">-</div>
+                        <div class="metric-label">Estimated Accuracy</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="weakSupervisionChart"></canvas>
+            </div>
+        </div>
+
+        <div class="tab-content" id="results">
+            <div class="section">
+                <h3>📈 Performance Improvements</h3>
+                <div class="algorithm-comparison">
+                    <div class="algorithm-card">
+                        <h4>Precision on Disagreements</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 75%"></div>
+                        </div>
+                        <div>Baseline: 67% → Weak Supervision: 78% (11% improvement)</div>
+                    </div>
+                    <div class="algorithm-card">
+                        <h4>Recall on Disagreements</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 85%"></div>
+                        </div>
+                        <div>Baseline: 54% → Weak Supervision: 85% (31% improvement)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>⚡ Time to Detection Improvements</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">1.0x</div>
+                        <div class="metric-label">Baseline (60 min)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0.72x</div>
+                        <div class="metric-label">20-min + 60-min models</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0.65x</div>
+                        <div class="metric-label">10-min + 20-min + 60-min</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0.55x</div>
+                        <div class="metric-label">With Weak Supervision</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📊 Coverage Comparison</h3>
+                <div class="chart-container">
+                    <canvas id="resultsChart"></canvas>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🎯 Key Takeaways</h3>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><strong>Iterative Approach:</strong> Starting simple and adding complexity based on real-world feedback</li>
+                    <li><strong>Sequential Models:</strong> Trading off precision, recall, and time to detection</li>
+                    <li><strong>Weak Supervision:</strong> Using domain knowledge to generate high-quality labels</li>
+                    <li><strong>45% Improvement:</strong> In time to detection compared to original approach</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let deploymentChart = null;
+        let sequentialChart = null;
+        let weakSupervisionChart = null;
+        let resultsChart = null;
+        let deploymentHistory = [];
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                this.classList.add('active');
+                document.getElementById(this.dataset.tab).classList.add('active');
+                
+                // Initialize charts when tabs are opened
+                if (this.dataset.tab === 'weak-supervision' && !weakSupervisionChart) {
+                    initWeakSupervisionChart();
+                }
+                if (this.dataset.tab === 'results' && !resultsChart) {
+                    initResultsChart();
+                }
+            });
+        });
+
+        // Range input updates
+        document.getElementById('errorIncrease').addEventListener('input', function() {
+            document.getElementById('errorIncreaseValue').textContent = this.value + '%';
+        });
+
+        document.getElementById('baseError').addEventListener('input', function() {
+            document.getElementById('baseErrorValue').textContent = this.value + '%';
+        });
+
+        // Deployment simulation
+        function simulateDeployment() {
+            const type = document.getElementById('deploymentType').value;
+            const errorIncrease = parseInt(document.getElementById('errorIncrease').value);
+            const baseError = parseFloat(document.getElementById('baseError').value);
+            
+            // Generate time series data
+            const timePoints = [];
+            const errorRates = [];
+            const deploymentTime = 30; // Deployment happens at 30 minutes
+            
+            for (let i = 0; i < 120; i++) {
+                timePoints.push(i);
+                let errorRate = baseError;
+                
+                if (i >= deploymentTime) {
+                    switch (type) {
+                        case 'faulty':
+                            errorRate = baseError + (baseError * errorIncrease / 100);
+                            break;
+                        case 'seasonal':
+                            errorRate = baseError + (baseError * errorIncrease / 100) * Math.sin((i - deploymentTime) / 10);
+                            break;
+                        case 'lowTraffic':
+                            errorRate = baseError + (baseError * errorIncrease / 100) * (Math.random() > 0.7 ? 1 : 0);
+                            break;
+                    }
+                }
+                
+                // Add some noise
+                errorRate += (Math.random() - 0.5) * 0.5;
+                errorRates.push(Math.max(0, errorRate));
+            }
+            
+            updateDeploymentChart(timePoints, errorRates, deploymentTime);
+            runStatisticalChecks(type, errorIncrease, baseError);
+            addToDeploymentHistory(type, errorIncrease, baseError);
+        }
+
+        function updateDeploymentChart(timePoints, errorRates, deploymentTime) {
+            const ctx = document.getElementById('deploymentChart').getContext('2d');
+            
+            if (deploymentChart) {
+                deploymentChart.destroy();
+            }
+            
+            deploymentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timePoints,
+                    datasets: [{
+                        label: 'Error Rate (%)',
+                        data: errorRates,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time (minutes)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Error Rate (%)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    xMin: deploymentTime,
+                                    xMax: deploymentTime,
+                                    borderColor: '#ff6b6b',
+                                    borderWidth: 2,
+                                    label: {
+                                        content: 'Deployment',
+                                        enabled: true,
+                                        position: 'top'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function runStatisticalChecks(type, errorIncrease, baseError) {
+            // Impact check
+            const impactPassed = errorIncrease > 25;
+            document.getElementById('impactCheck').textContent = impactPassed ? 'PASS' : 'FAIL';
+            document.getElementById('impactCheck').style.color = impactPassed ? '#28a745' : '#dc3545';
+            
+            // Temporal check
+            const temporalPassed = type !== 'normal';
+            document.getElementById('temporalCheck').textContent = temporalPassed ? 'PASS' : 'FAIL';
+            document.getElementById('temporalCheck').style.color = temporalPassed ? '#28a745' : '#dc3545';
+            
+            // Persistence check
+            const persistencePassed = errorIncrease > 30 && type !== 'lowTraffic';
+            document.getElementById('persistenceCheck').textContent = persistencePassed ? 'PASS' : 'FAIL';
+            document.getElementById('persistenceCheck').style.color = persistencePassed ? '#28a745' : '#dc3545';
+            
+            // Final decision (unanimous voting)
+            const finalDecision = impactPassed && temporalPassed && persistencePassed;
+            document.getElementById('finalDecision').textContent = finalDecision ? 'FAULTY' : 'HEALTHY';
+            document.getElementById('finalDecision').style.color = finalDecision ? '#dc3545' : '#28a745';
+        }
+
+        function addToDeploymentHistory(type, errorIncrease, baseError) {
+            const timestamp = new Date().toLocaleTimeString();
+            const decision = document.getElementById('finalDecision').textContent;
+            
+            deploymentHistory.unshift({
+                timestamp,
+                type,
+                errorIncrease,
+                baseError,
+                decision
+            });
+            
+            // Keep only last 10 deployments
+            if (deploymentHistory.length > 10) {
+                deploymentHistory.pop();
+            }
+            
+            updateDeploymentHistoryDisplay();
+        }
+
+        function updateDeploymentHistoryDisplay() {
+            const container = document.getElementById('deploymentHistory');
+            
+            if (deploymentHistory.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Simulate deployments to see history</div>';
+                return;
+            }
+            
+            container.innerHTML = deploymentHistory.map(deployment => `
+                <div class="deployment-item">
+                    <div>
+                        <strong>${deployment.timestamp}</strong><br>
+                        ${deployment.type} deployment (${deployment.errorIncrease}% increase)
+                    </div>
+                    <div class="deployment-status status-${deployment.decision.toLowerCase()}">
+                        ${deployment.decision}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function runSequentialModel(timeWindow) {
+            const ctx = document.getElementById('sequentialChart').getContext('2d');
+            
+            if (sequentialChart) {
+                sequentialChart.destroy();
+            }
+            
+            // Generate sample data for the model
+            const timePoints = Array.from({length: 60}, (_, i) => i + 1);
+            const ensembleData = timePoints.map(t => Math.random() > 0.7 ? 1 : 0);
+            const modelPredictions = timePoints.map(t => {
+                if (t <= timeWindow) {
+                    return Math.random() > 0.5 ? 1 : 0;
+                }
+                return null;
+            });
+            
+            sequentialChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timePoints,
+                    datasets: [{
+                        label: '60-min Ensemble',
+                        data: ensembleData,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        fill: false
+                    }, {
+                        label: `${timeWindow}-min Model`,
+                        data: modelPredictions,
+                        borderColor: '#764ba2',
+                        backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Time (minutes)' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Prediction (0=Healthy, 1=Faulty)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function resetSequentialDemo() {
+            if (sequentialChart) {
+                sequentialChart.destroy();
+                sequentialChart = null;
+            }
+        }
+
+        function trainSupervisedModel() {
+            const featureSet = document.getElementById('featureSet').value;
+            alert(`Training model with ${featureSet} features...`);
+        }
+
+        function generateWeakLabel() {
+            const hasRollback = document.getElementById('hasRollback').checked;
+            const hasShortLived = document.getElementById('hasShortLived').checked;
+            const hasNewErrors = document.getElementById('hasNewErrors').checked;
+            const hasIncident = document.getElementById('hasIncident').checked;
+            
+            // Calculate confidence based on weak signals
+            let confidence = 0;
+            let signals = 0;
+            
+            if (hasRollback) { confidence += 0.85; signals++; }
+            if (hasShortLived) { confidence += 0.72; signals++; }
+            if (hasNewErrors) { confidence += 0.68; signals++; }
+            if (hasIncident) { confidence += 0.91; signals++; }
+            
+            const avgConfidence = signals > 0 ? confidence / signals : 0;
+            const prediction = avgConfidence > 0.7 ? 'FAULTY' : 'HEALTHY';
+            
+            document.getElementById('weakLabelConfidence').textContent = (avgConfidence * 100).toFixed(1) + '%';
+            document.getElementById('weakLabelPrediction').textContent = prediction;
+            document.getElementById('weakLabelCoverage').textContent = '85%';
+            document.getElementById('weakLabelAccuracy').textContent = '92%';
+        }
+
+        function initWeakSupervisionChart() {
+            const ctx = document.getElementById('weakSupervisionChart').getContext('2d');
+            
+            weakSupervisionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Rollback', 'Short-lived', 'New Errors', 'Statistical', 'Incident', 'Performance'],
+                    datasets: [{
+                        label: 'Weight',
+                        data: [0.85, 0.72, 0.68, 0.79, 0.91, 0.64],
+                        backgroundColor: ['#667eea', '#764ba2', '#9b59b6', '#3498db', '#e74c3c', '#f39c12']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            title: { display: true, text: 'Weight' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initResultsChart() {
+            const ctx = document.getElementById('resultsChart').getContext('2d');
+            
+            resultsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Unsupervised', 'Supervised (60min)', 'Supervised (20min)', 'Weak Supervision'],
+                    datasets: [{
+                        label: 'Coverage (%)',
+                        data: [62.9, 62.9, 25.9, 78.5],
+                        backgroundColor: ['#667eea', '#764ba2', '#9b59b6', '#e74c3c']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: { display: true, text: 'Coverage (%)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize charts when page loads
+        window.addEventListener('load', function() {
+            // Initialize with a sample deployment
+            setTimeout(() => simulateDeployment(), 1000);
+        });
+    </script>
+</body>
+</html>
